@@ -15,6 +15,8 @@ Panels:
         - /Odometry1/Odometry1/Covariance1/Position1
         - /Odometry1/Odometry1/Covariance1/Orientation1
         - /Path1
+        - /MarkerArray1
+        - /MarkerArray1/Namespaces1
       Splitter Ratio: 0.6432291865348816
     Tree Height: 782
   - Class: rviz/Selection
@@ -34,7 +36,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: surround
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -287,6 +289,14 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: false
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /lio_sam/loop_closure_constraints
+      Name: MarkerArray
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 0; 0; 0
@@ -315,7 +325,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 46.0853271484375
+      Distance: 19.996143341064453
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -323,17 +333,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -4.982542037963867
-        Y: -15.83572006225586
-        Z: -3.063523054122925
+        X: 7.612188339233398
+        Y: -8.041707992553711
+        Z: 1.8300669193267822
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: true
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.399796724319458
+      Pitch: 0.50479656457901
       Target Frame: global
-      Yaw: 1.277182698249817
+      Yaw: 3.920320749282837
     Saved: ~
 Window Geometry:
   Displays:
@@ -351,5 +361,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1567
-  X: 67
-  Y: 27
+  X: 2709
+  Y: 133

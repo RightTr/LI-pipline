@@ -54,6 +54,8 @@
 #include <atomic>
 #include "posebuffer.h"
 #include <thread>
+#include "map_optimization.h"
+#include "utility.h"
 
 #ifdef USE_ROS1
 #include <ros/ros.h>
@@ -166,7 +168,9 @@ bool   point_selected_surf[100000] = {0};
 bool   lidar_pushed, flg_first_scan = true, flg_exit = false, flg_EKF_inited;
 bool   scan_pub_en = false, dense_pub_en = false, scan_body_pub_en = false;
 bool reloc_en = false;
+bool sam_enable = false;
 int lidar_type;
+int odom_imu_frequency;
 
 vector<vector<int>>  pointSearchInd_surf; 
 vector<BoxPointType> cub_needrm;
@@ -580,6 +584,7 @@ bool sync_packages(MeasureGroup &meas)
     lidar_buffer.pop_front();
     time_buffer.pop_front();
     lidar_pushed = false;
+    setLaserCurTime(lidar_end_time);
     return true;
 }
 
@@ -635,6 +640,33 @@ void map_incremental()
 
 PointCloudXYZI::Ptr pcl_wait_pub(new PointCloudXYZI(500000, 1));
 PointCloudXYZI::Ptr pcl_wait_save(new PointCloudXYZI());
+
+void getCurrPose(const state_ikfom& curr_state) {
+    Eigen::Vector3d eulerAngle = curr_state.rot.matrix().eulerAngles(2,1,0); 
+    
+    transformTobeMapped[0] = eulerAngle(2);             
+    transformTobeMapped[1] = eulerAngle(1);          
+    transformTobeMapped[2] = eulerAngle(0);        
+    transformTobeMapped[3] = curr_state.pos(0);
+    transformTobeMapped[4] = curr_state.pos(1);
+    transformTobeMapped[5] = curr_state.pos(2);
+}
+
+void update_state_ikfom()
+{
+    state_ikfom state_updated = kf.get_x();
+    Eigen::Vector3d pos(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5]);
+    Eigen::Quaterniond q = Eigen::Quaterniond(Eigen::AngleAxisd(transformTobeMapped[2], Eigen::Vector3d::UnitZ()) *
+                             Eigen::AngleAxisd(transformTobeMapped[1], Eigen::Vector3d::UnitY()) *
+                             Eigen::AngleAxisd(transformTobeMapped[0], Eigen::Vector3d::UnitX()));
+
+    // Only update pose
+    state_updated.pos = pos;
+    state_updated.rot =  q;
+    state_point = state_updated;
+
+    kf.change_x(state_updated);
+}
 
 void publish_frame_world(const Pcl2Publisher & pubLaserCloudFull)
 {
@@ -771,7 +803,7 @@ void publish_map(const Pcl2Publisher & pubLaserCloudMap)
 #ifdef USE_ROS1
 void publish_odometryhighfreq(PoseBuffer& pbuffer, const OdomPublisher& pubOdomHighFreq)
 {
-    RateType rate(200);
+    RateType rate(odom_imu_frequency);
     while (ros::ok()){
         Pose pose = pbuffer.Pop();
         OdomMsg msg;
@@ -815,7 +847,7 @@ void publish_odometryhighfreq(PoseBuffer& pbuffer, const OdomPublisher& pubOdomH
 #elif defined(USE_ROS2)
 void publish_odometryhighfreq(const rclcpp::Node::SharedPtr node_, PoseBuffer& pbuffer, const OdomPublisher& pubOdomHighFreq)
 {
-    RateType rate(200);
+    RateType rate(odom_imu_frequency);
     while (rclcpp::ok()){
         Pose pose = pbuffer.Pop();
         OdomMsg msg;
@@ -1094,6 +1126,7 @@ int main(int argc, char** argv)
         ros::init(argc, argv, "laserMapping");
         ros::NodeHandle nh;
 
+        nh.param<bool>("sam_enable", sam_enable, false);
         nh.param<bool>("publish/path_en",path_en, true);
         nh.param<bool>("publish/scan_publish_en",scan_pub_en, true);
         nh.param<bool>("publish/dense_publish_en",dense_pub_en, true);
@@ -1131,11 +1164,15 @@ int main(int argc, char** argv)
         nh.param<int>("pcd_save/interval", pcd_save_interval, -1);
         nh.param<vector<double>>("mapping/extrinsic_T", extrinT, vector<double>());
         nh.param<vector<double>>("mapping/extrinsic_R", extrinR, vector<double>());
+        nh.param<int>("publish/odom_imu_frequency", odom_imu_frequency, 100);
         path.header.stamp    = ros::Time::now();
         path.header.frame_id ="camera_init";
+
+        if (sam_enable) read_liosam_params(nh);
     #elif defined(USE_ROS2)
         rclcpp::init(argc, argv);
         rclcpp::Node::SharedPtr node = rclcpp::Node::make_shared("laserMapping");
+        sam_enable = node->declare_parameter<bool>("sam_enable", false);
         path_en = node->declare_parameter<bool>("publish.path_en", true);
         scan_pub_en = node->declare_parameter<bool>("publish.scan_publish_en", true);
         dense_pub_en = node->declare_parameter<bool>("publish.dense_publish_en", true);
@@ -1173,6 +1210,7 @@ int main(int argc, char** argv)
         pcd_save_interval = node->declare_parameter<int>("pcd_save.interval", -1);
         extrinT = node->declare_parameter<vector<double>>("mapping.extrinsic_T", vector<double>());
         extrinR = node->declare_parameter<vector<double>>("mapping.extrinsic_R", vector<double>());
+        odom_imu_frequency = node->declare_parameter<int>("publish.odom_imu_frequency", 100);
         path.header.stamp = rclcpp::Clock().now(); 
         path.header.frame_id = "camera_init";
     #endif
@@ -1277,14 +1315,29 @@ int main(int argc, char** argv)
             rclcpp::QoS(rclcpp::KeepLast(50)).reliable());
     #endif
 
-    std::thread th([&](){
+    if (sam_enable) {
+        MapOptimizationInit();
+        #ifdef USE_ROS1
+            ROS_INFO("...... LIO-SAM Backend Start......");
+        #elif defined(USE_ROS2)
+            RCLCPP_INFO(rclcpp::get_logger("fast_lio"), "...... LIO-SAM Backend Start......");
+        #endif
+    }
+
+    std::thread odomhighthread([&](){
         #ifdef USE_ROS1
             publish_odometryhighfreq(p_imu->pbuffer, pubOdomHighFreq);
         #elif defined(USE_ROS2)
             publish_odometryhighfreq(node, p_imu->pbuffer, pubOdomHighFreq);
         #endif
     });
-    th.detach();
+    odomhighthread.detach();
+    
+    if (sam_enable)
+    {
+        std::thread loopthread(&loopClosureThread);
+        loopthread.detach();
+    }
 
 //------------------------------------------------------------------------------------------------------
     signal(SIGINT, SigHandle);
@@ -1457,6 +1510,15 @@ int main(int argc, char** argv)
             geoQuat.w = state_point.rot.coeffs()[3];
 
             double t_update_end = omp_get_wtime();
+            
+            if (sam_enable) {
+                getCurrPose(state_point);
+                saveKeyFramesAndFactor(feats_undistort);
+                update_state_ikfom(); // Update current state_point
+                correctPoses();
+
+                publishKeyFramePoses();
+            }
 
             /******* Publish odometry *******/
             #ifdef USE_ROS1
@@ -1549,6 +1611,5 @@ int main(int argc, char** argv)
         fclose(fp2);
     }
     
-    th.join();
     return 0;
 }

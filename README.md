@@ -61,7 +61,7 @@ Now, FAST-LIO supports tracking and mapping using the RoboSense LiDARs (e.g., Ro
 ## TODO List
 
 * Robosense Airy LiDAR Support ✅ (2026.1.24)
-* Robosense Airy Adaption Test
+* Robosense Airy Adaption Test ✅ (2026.3.6)
 
 ## Related Works and Extended Application
 

@@ -44,6 +44,7 @@ find_path(MATPLOTLIB_CPP_INCLUDE_DIRS "matplotlibcpp.h")
 
 find_package(Eigen3 REQUIRED)
 find_package(PCL 1.8 REQUIRED)
+find_package(GTSAM REQUIRED QUIET)
 
 message(Eigen: ${EIGEN3_INCLUDE_DIR})
 include_directories(
@@ -51,6 +52,7 @@ include_directories(
   ${EIGEN3_INCLUDE_DIR}
   ${PCL_INCLUDE_DIRS}
   ${PYTHON_INCLUDE_DIRS}
+	${GTSAM_INCLUDE_DIR}
   include)
 
 
@@ -98,12 +100,12 @@ if(USE_ROS1)
 
   catkin_package(
     CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs message_runtime
-    DEPENDS EIGEN3 PCL
+    DEPENDS EIGEN3 PCL GTSAM
     INCLUDE_DIRS
   )
 
-  add_executable(fastlio_mapping src/laserMapping.cpp include/ikd-Tree/ikd_Tree.cpp src/preprocess.cpp)
-  target_link_libraries(fastlio_mapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES})
+  add_executable(fastlio_mapping src/laserMapping.cpp include/ikd-Tree/ikd_Tree.cpp src/preprocess.cpp src/utility.cpp src/MapOptimization.cpp)
+  target_link_libraries(fastlio_mapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES} gtsam)
   target_include_directories(fastlio_mapping PRIVATE ${PYTHON_INCLUDE_DIRS})
 endif()
 
