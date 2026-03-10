@@ -1,4 +1,4 @@
-#include "ikd_Tree.h"
+#include "ikd_Tree.hpp"
 
 /*
 Description: ikd-Tree: an incremental k-d tree for robotic applications 
@@ -26,8 +26,6 @@ KD_TREE<PointType>::~KD_TREE()
     PointVector().swap(PCL_Storage);
     Rebuild_Logger.clear();
 }
-
-
 
 template <typename PointType>
 void KD_TREE<PointType>::InitializeKDTree(float delete_param, float balance_param, float box_length)
@@ -67,7 +65,7 @@ void KD_TREE<PointType>::InitTreeNode(KD_TREE_NODE *root)
 }
 
 template <typename PointType>
-int KD_TREE<PointType>::size()
+int KD_TREE<PointType>::Size()
 {
     int s = 0;
     if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node)
@@ -406,31 +404,34 @@ void KD_TREE<PointType>::run_operation(KD_TREE_NODE **root, Operation_Logger_Typ
 }
 
 template <typename PointType>
-void KD_TREE<PointType>::Build(PointVector point_cloud)
+void KD_TREE<PointType>::Build(PointVector input)
 {
     if (Root_Node != nullptr)
     {
         delete_tree_nodes(&Root_Node);
     }
-    if (point_cloud.size() == 0)
+    if (input.size() == 0)
         return;
     STATIC_ROOT_NODE = new KD_TREE_NODE;
     InitTreeNode(STATIC_ROOT_NODE);
-    BuildTree(&STATIC_ROOT_NODE->left_son_ptr, 0, point_cloud.size() - 1, point_cloud);
+    BuildTree(&STATIC_ROOT_NODE->left_son_ptr, 0, input.size() - 1, input);
     Update(STATIC_ROOT_NODE);
     STATIC_ROOT_NODE->TreeSize = 0;
     Root_Node = STATIC_ROOT_NODE->left_son_ptr;
 }
 
 template <typename PointType>
-void KD_TREE<PointType>::Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> &Point_Distance, float max_dist)
+void KD_TREE<PointType>::Nearest_Search(const PointType& PointQuery, int k_nearest, 
+    PointVector &Nearest_Points, 
+    vector<float> &Point_Distance, 
+    float max_dist)
 {
     MANUAL_HEAP q(2 * k_nearest);
     q.clear();
     vector<float>().swap(Point_Distance);
     if (Rebuild_Ptr == nullptr || *Rebuild_Ptr != Root_Node)
     {
-        Search(Root_Node, k_nearest, point, q, max_dist);
+        Search(Root_Node, k_nearest, PointQuery, q, max_dist);
     }
     else
     {
@@ -443,7 +444,7 @@ void KD_TREE<PointType>::Nearest_Search(PointType point, int k_nearest, PointVec
         }
         search_mutex_counter += 1;
         pthread_mutex_unlock(&search_flag_mutex);
-        Search(Root_Node, k_nearest, point, q, max_dist);
+        Search(Root_Node, k_nearest, PointQuery, q, max_dist);
         pthread_mutex_lock(&search_flag_mutex);
         search_mutex_counter -= 1;
         pthread_mutex_unlock(&search_flag_mutex);
@@ -478,7 +479,7 @@ template <typename PointType>
 int KD_TREE<PointType>::Add_Points(PointVector &PointToAdd, bool downsample_on)
 {
     int NewPointSize = PointToAdd.size();
-    int tree_size = size();
+    int tree_size = Size();
     BoxPointType Box_of_Point;
     PointType downsample_result, mid_point;
     bool downsample_switch = downsample_on && DOWNSAMPLE_SWITCH;
@@ -1720,9 +1721,4 @@ bool KD_TREE<PointType>::point_cmp_z(PointType a, PointType b) { return a.z < b.
 
 // manual queue
 
-
-// Manual Instatiations
-template class KD_TREE<pcl::PointXYZ>;
-template class KD_TREE<pcl::PointXYZI>;
-template class KD_TREE<pcl::PointXYZINormal>;
 

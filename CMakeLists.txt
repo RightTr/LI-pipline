@@ -3,17 +3,17 @@ project(fast_lio_sam)
 
 SET(CMAKE_BUILD_TYPE "Debug")
 
-ADD_COMPILE_OPTIONS(-std=c++14 )
-ADD_COMPILE_OPTIONS(-std=c++14 )
 set( CMAKE_CXX_FLAGS "-std=c++17 -O3" )
 
 add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fexceptions" )
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pthread -std=c++0x -std=c++14 -fexceptions")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fexceptions")
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w")
 
 message("Current CPU archtecture: ${CMAKE_SYSTEM_PROCESSOR}")
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)" )
@@ -104,7 +104,11 @@ if(USE_ROS1)
     INCLUDE_DIRS
   )
 
-  add_executable(fastlio_mapping src/laserMapping.cpp include/ikd-Tree/ikd_Tree.cpp src/preprocess.cpp src/utility.cpp src/MapOptimization.cpp)
+  add_executable(fastlio_mapping src/laserMapping.cpp 
+    include/map/ikd-Tree/ikd_Tree.cpp 
+    include/map/octvox/octvox.cpp
+    src/preprocess.cpp src/utility.cpp 
+    src/mapOptimization.cpp)
   target_link_libraries(fastlio_mapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES} gtsam)
   target_include_directories(fastlio_mapping PRIVATE ${PYTHON_INCLUDE_DIRS})
 endif()

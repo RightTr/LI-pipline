@@ -1,5 +1,5 @@
 #define private public
-#include <ikd-Tree/ikd_Tree.h>
+#include <map/ikd-Tree/ikd_Tree.hpp>
 #undef private
 
 template<typename PointType>

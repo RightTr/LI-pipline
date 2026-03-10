@@ -10,6 +10,10 @@
 #include <memory.h>
 #include <pcl/point_types.h>
 
+#include "../mapWrapper.hpp"
+
+#include <chrono>
+
 #define EPSS 1e-6
 #define Minimal_Unbalanced_Tree_Size 10
 #define Multi_Thread_Rebuild_Point_Num 1500
@@ -21,12 +25,6 @@ using namespace std;
 
 // typedef pcl::PointXYZINormal PointType;
 // typedef vector<PointType, Eigen::aligned_allocator<PointType>>  PointVector;
-
-struct BoxPointType
-{
-    float vertex_min[3];
-    float vertex_max[3];
-};
 
 enum operation_set
 {
@@ -46,8 +44,7 @@ enum delete_point_storage_set
 };
 
 template <typename PointType>
-class KD_TREE
-{
+class KD_TREE : public MapWrapper<PointType> {
     // using MANUAL_Q_ = MANUAL_Q<typename PointType>;
     // using PointVector = std::vector<PointType>;
     
@@ -55,6 +52,7 @@ class KD_TREE
 public:
     using PointVector = std::vector<PointType, Eigen::aligned_allocator<PointType>>;
     using Ptr = std::shared_ptr<KD_TREE<PointType>>;
+    using MapConfig = typename MapWrapper<PointType>::MapConfig;
     
     struct KD_TREE_NODE
     {
@@ -320,25 +318,60 @@ public:
     {
         downsample_size = downsample_param;
     }
+    void SetConfig(const MapConfig& config) override {
+        Set_delete_criterion_param(config.delete_param_);
+        Set_balance_criterion_param(config.balance_param_);
+        set_downsample_param(config.box_length_);
+    }
+
     void InitializeKDTree(float delete_param = 0.5, float balance_param = 0.7, float box_length = 0.2);
-    int size();
+    int Size() override;
     int validnum();
     void root_alpha(float &alpha_bal, float &alpha_del);
-    void Build(PointVector point_cloud);
-    void Nearest_Search(PointType point, int k_nearest, PointVector &Nearest_Points, vector<float> &Point_Distance, float max_dist = INFINITY);
+    void Build(PointVector input) override;
+    
+    void Nearest_Search(const PointType& PointQuery, int k_nearest, 
+            PointVector &Nearest_Points, 
+            vector<float> &Point_Distance, 
+            float max_dist = INFINITY) override;
+
     void Box_Search(const BoxPointType &Box_of_Point, PointVector &Storage);
     void Radius_Search(PointType point, const float radius, PointVector &Storage);
     int Add_Points(PointVector &PointToAdd, bool downsample_on);
     void Add_Point_Boxes(vector<BoxPointType> &BoxPoints);
     void Delete_Points(PointVector &PointToDel);
-    int Delete_Point_Boxes(vector<BoxPointType> &BoxPoints);
+
+    int Delete_Point_Boxes(vector<BoxPointType> &BoxPoints) override;
+
     void flatten(KD_TREE_NODE *root, PointVector &Storage, delete_point_storage_set storage_type);
     void acquire_removed_points(PointVector &removed_points);
+
+    void InsertPoints(PointVector& Points, bool downsample = false) override {
+        Add_Points(Points, downsample);
+    }
+
+    void Clear() override {
+        delete_tree_nodes(&Root_Node);
+        PointVector().swap(PCL_Storage);
+    }
+
+    bool IsInitialized() override {
+        return Root_Node != nullptr;
+    }
+
+    void GetMap(PointVector& MapPoints) override {
+        flatten(Root_Node, MapPoints, NOT_RECORD);
+    }
+
     BoxPointType tree_range();
     PointVector PCL_Storage;
     KD_TREE_NODE *Root_Node = nullptr;
     int max_queue_size = 0;
 };
+
+template class KD_TREE<pcl::PointXYZ>;
+template class KD_TREE<pcl::PointXYZI>;
+template class KD_TREE<pcl::PointXYZINormal>;
 
 // template <typename PointType>
 // PointType KD_TREE<PointType>::zeroP = PointType(0,0,0);

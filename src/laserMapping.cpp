@@ -49,13 +49,16 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/io/pcd_io.h>
 #include "preprocess.h"
-#include "ikdtree_public.hpp"
 #include <reloc.h>
 #include <atomic>
 #include "posebuffer.h"
 #include <thread>
 #include "map_optimization.h"
 #include "utility.h"
+
+#include "map/mapWrapper.hpp"
+#include "map/octvox/octvox.hpp"
+#include "map/ikd-Tree/ikd_Tree.hpp"
 
 #ifdef USE_ROS1
 #include <ros/ros.h>
@@ -139,7 +142,7 @@ inline bool ros_ok(){
 double kdtree_incremental_time = 0.0, kdtree_search_time = 0.0, kdtree_delete_time = 0.0;
 double T1[MAXN], s_plot[MAXN], s_plot2[MAXN], s_plot3[MAXN], s_plot4[MAXN], s_plot5[MAXN], s_plot6[MAXN], s_plot7[MAXN], s_plot8[MAXN], s_plot9[MAXN], s_plot10[MAXN], s_plot11[MAXN];
 double match_time = 0, solve_time = 0, solve_const_H_time = 0;
-int    kdtree_size_st = 0, kdtree_size_end = 0, add_point_size = 0, kdtree_delete_counter = 0;
+int kdtree_size_end = 0, kdtree_delete_counter = 0;
 bool   runtime_pos_log = false, pcd_save_en = false, time_sync_en = false, extrinsic_est_en = true, path_en = true;
 /**************************/
 
@@ -196,9 +199,9 @@ PointCloudXYZI::Ptr corr_normvect(new PointCloudXYZI(100000, 1));
 PointCloudXYZI::Ptr _featsArray;
 
 pcl::VoxelGrid<PointType> downSizeFilterSurf;
-pcl::VoxelGrid<PointType> downSizeFilterMap;
 
-KD_TREE_PUBLIC<PointType> ikdtree;
+MapWrapper<PointType>::Ptr map_wrapper = std::make_shared<OctVoxMap<PointType, float>>();
+// MapWrapper<PointType>::Ptr map_wrapper = std::make_shared<KD_TREE<PointType>>();
 
 V3F XAxisPoint_body(LIDAR_SP_LEN, 0.0, 0.0);
 V3F XAxisPoint_world(LIDAR_SP_LEN, 0.0, 0.0);
@@ -259,7 +262,6 @@ void pointBodyToWorld_ikfom(PointType const * const pi, PointType * const po, st
     po->intensity = pi->intensity;
 }
 
-
 void pointBodyToWorld(PointType const * const pi, PointType * const po)
 {
     V3D p_body(pi->x, pi->y, pi->z);
@@ -302,13 +304,6 @@ void RGBpointBodyLidarToIMU(PointType const * const pi, PointType * const po)
     po->y = p_body_imu(1);
     po->z = p_body_imu(2);
     po->intensity = pi->intensity;
-}
-
-void points_cache_collect()
-{
-    PointVector points_history;
-    ikdtree.acquire_removed_points(points_history);
-    // for (int i = 0; i < points_history.size(); i++) _featsArray->push_back(points_history[i]);
 }
 
 BoxPointType LocalMap_Points;
@@ -355,9 +350,8 @@ void lasermap_fov_segment()
     }
     LocalMap_Points = New_LocalMap_Points;
 
-    points_cache_collect();
     double delete_begin = omp_get_wtime();
-    if(cub_needrm.size() > 0) kdtree_delete_counter = ikdtree.Delete_Point_Boxes(cub_needrm);
+    if(cub_needrm.size() > 0) kdtree_delete_counter = map_wrapper->Delete_Point_Boxes(cub_needrm);
     kdtree_delete_time = omp_get_wtime() - delete_begin;
 }
 
@@ -632,9 +626,8 @@ void map_incremental()
     }
 
     double st_time = omp_get_wtime();
-    add_point_size = ikdtree.Add_Points(PointToAdd, true);
-    ikdtree.Add_Points(PointNoNeedDownsample, false); 
-    add_point_size = PointToAdd.size() + PointNoNeedDownsample.size();
+    map_wrapper->InsertPoints(PointToAdd, true);
+    map_wrapper->InsertPoints(PointNoNeedDownsample, false);
     kdtree_incremental_time = omp_get_wtime() - st_time;
 }
 
@@ -1030,7 +1023,7 @@ void h_share_model(state_ikfom &s, esekfom::dyn_share_datastruct<double> &ekfom_
         if (ekfom_data.converge)
         {
             /** Find the closest surfaces in the map **/
-            ikdtree.Nearest_Search(point_world, NUM_MATCH_POINTS, points_near, pointSearchSqDis);
+            map_wrapper->Nearest_Search(point_world, NUM_MATCH_POINTS, points_near, pointSearchSqDis);
             point_selected_surf[i] = points_near.size() < NUM_MATCH_POINTS ? false : pointSearchSqDis[NUM_MATCH_POINTS - 1] > 5 ? false : true;
         }
 
@@ -1231,7 +1224,6 @@ int main(int argc, char** argv)
     memset(point_selected_surf, true, sizeof(point_selected_surf));
     memset(res_last, -1000.0f, sizeof(res_last));
     downSizeFilterSurf.setLeafSize(filter_size_surf_min, filter_size_surf_min, filter_size_surf_min);
-    downSizeFilterMap.setLeafSize(filter_size_map_min, filter_size_map_min, filter_size_map_min);
     memset(point_selected_surf, true, sizeof(point_selected_surf));
     memset(res_last, -1000.0f, sizeof(res_last));
 
@@ -1378,7 +1370,7 @@ int main(int argc, char** argv)
                 }        
                 state_point_reloc.rot.normalize();
                 kf.reset(state_point_reloc);
-                ikdtree.delete_tree_nodes(&ikdtree.Root_Node);
+                map_wrapper->Clear();
                 
                 #ifdef USE_ROS1
                     ROS_INFO("Reloc: pos=(%.2f %.2f %.2f), quat=(%.2f %.2f %.2f %.2f)",
@@ -1444,22 +1436,21 @@ int main(int argc, char** argv)
             t1 = omp_get_wtime();
             feats_down_size = feats_down_body->points.size();
             /*** initialize the map kdtree ***/
-            if(ikdtree.Root_Node == nullptr)
+            if(!map_wrapper->IsInitialized())
             {
                 if(feats_down_size > 5)
                 {
-                    ikdtree.set_downsample_param(filter_size_map_min);
+                    MapWrapper<PointType>::MapConfig mapConfig;
+                    map_wrapper->SetConfig(mapConfig);
                     feats_down_world->resize(feats_down_size);
                     for(int i = 0; i < feats_down_size; i++)
                     {
                         pointBodyToWorld(&(feats_down_body->points[i]), &(feats_down_world->points[i]));
                     }
-                    ikdtree.Build(feats_down_world->points);
+                    map_wrapper->Build(feats_down_world->points);
                 }
                 continue;
             }
-            int featsFromMapNum = ikdtree.validnum();
-            kdtree_size_st = ikdtree.size();
             
             // cout<<"[ mapping ]: In num: "<<feats_undistort->points.size()<<" downsamp "<<feats_down_size<<" Map num: "<<featsFromMapNum<<"effect num:"<<effct_feat_num<<endl;
 
@@ -1483,10 +1474,10 @@ int main(int argc, char** argv)
 
             if(feature_pub_en) // If you need to see map point, change to "if(1)"
             {
-                PointVector ().swap(ikdtree.PCL_Storage);
-                ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage, NOT_RECORD);
+                PointVector ().swap(map_wrapper->PCL_Storage);
+                map_wrapper->GetMap(map_wrapper->PCL_Storage);
                 featsFromMap->clear();
-                featsFromMap->points = ikdtree.PCL_Storage;
+                featsFromMap->points = map_wrapper->PCL_Storage;
             }
 
             pointSearchInd_surf.resize(feats_down_size);
@@ -1542,7 +1533,7 @@ int main(int argc, char** argv)
             if (runtime_pos_log)
             {
                 frame_num ++;
-                kdtree_size_end = ikdtree.size();
+                kdtree_size_end = map_wrapper->Size();
                 aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t5 - t0) / frame_num;
                 aver_time_icp = aver_time_icp * (frame_num - 1)/frame_num + (t_update_end - t_update_start) / frame_num;
                 aver_time_match = aver_time_match * (frame_num - 1)/frame_num + (match_time)/frame_num;
@@ -1556,10 +1547,8 @@ int main(int argc, char** argv)
                 s_plot4[time_log_counter] = kdtree_search_time;
                 s_plot5[time_log_counter] = kdtree_delete_counter;
                 s_plot6[time_log_counter] = kdtree_delete_time;
-                s_plot7[time_log_counter] = kdtree_size_st;
                 s_plot8[time_log_counter] = kdtree_size_end;
                 s_plot9[time_log_counter] = aver_time_consu;
-                s_plot10[time_log_counter] = add_point_size;
                 time_log_counter ++;
                 printf("[ mapping ]: time: IMU + Map + Input Downsample: %0.6f ave match: %0.6f ave solve: %0.6f  ave ICP: %0.6f  map incre: %0.6f ave total: %0.6f icp: %0.6f construct H: %0.6f \n",t1-t0,aver_time_match,aver_time_solve,t3-t1,t5-t3,aver_time_consu,aver_time_icp, aver_time_const_H_time);
                 ext_euler = SO3ToEuler(state_point.offset_R_L_I);
