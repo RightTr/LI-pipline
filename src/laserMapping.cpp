@@ -645,6 +645,11 @@ void getCurrPose(const state_ikfom& curr_state) {
     transformTobeMapped[5] = curr_state.pos(2);
 }
 
+void getCurrOffset(const state_ikfom& curr_state) {
+    translationLidarToIMU = curr_state.offset_T_L_I;
+    rotationLidarToIMU = curr_state.offset_R_L_I.toRotationMatrix();
+}
+
 void update_state_ikfom()
 {
     state_ikfom state_updated = kf.get_x();
@@ -1328,7 +1333,9 @@ int main(int argc, char** argv)
     if (sam_enable)
     {
         std::thread loopthread(&loopClosureThread);
+        std::thread globalthread(&visualizeGlobalMapThread);
         loopthread.detach();
+        globalthread.detach();
     }
 
 //------------------------------------------------------------------------------------------------------
@@ -1503,6 +1510,7 @@ int main(int argc, char** argv)
             
             if (sam_enable) {
                 getCurrPose(state_point);
+                getCurrOffset(state_point);
                 saveKeyFramesAndFactor(feats_undistort);
                 update_state_ikfom(); // Update current state_point
                 correctPoses();
