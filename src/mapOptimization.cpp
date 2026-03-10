@@ -786,7 +786,7 @@ void loopClosureThread()
     #ifdef USE_ROS1
         ROS_INFO("...... Loop Closure Thread Start......");
     #elif defined(USE_ROS2)
-        RCLCPP_INFO(rclcpp::get_logger("fast_lio_sam"), "...... Loop Closure Thread Start......");
+        RCLCPP_INFO(rclcpp::get_logger("li_pipline"), "...... Loop Closure Thread Start......");
     #endif
 
     ros::Rate rate(loopClosureFrequency);

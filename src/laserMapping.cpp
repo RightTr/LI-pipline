@@ -230,7 +230,7 @@ void SigHandle(int sig)
     #ifdef USE_ROS1
         ROS_WARN("catch sig %d", sig);
     #elif defined(USE_ROS2)
-        RCLCPP_WARN(rclcpp::get_logger("fast_lio_sam"), "catch sig %d", sig);
+        RCLCPP_WARN(rclcpp::get_logger("li_pipline"), "catch sig %d", sig);
     #endif
     sig_buffer.notify_all();
 }
@@ -369,7 +369,7 @@ void standard_pcl_cbk(const Pcl2MsgConstPtr &msg)
     #elif defined(USE_ROS2)
         if (msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9 < last_timestamp_lidar)
         {
-            RCLCPP_ERROR(rclcpp::get_logger("fast_lio_sam"), "lidar loop back, clear buffer");
+            RCLCPP_ERROR(rclcpp::get_logger("li_pipline"), "lidar loop back, clear buffer");
             lidar_buffer.clear();
         }
     #endif
@@ -406,7 +406,7 @@ void livox_pcl_cbk(const LivoxCustomMsgConstPtr &msg)
     #elif defined(USE_ROS2)
         if (msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9 < last_timestamp_lidar)
         {
-            RCLCPP_ERROR(rclcpp::get_logger("fast_lio_sam"), "lidar loop back, clear buffer");
+            RCLCPP_ERROR(rclcpp::get_logger("li_pipline"), "lidar loop back, clear buffer");
             lidar_buffer.clear();
         }
         last_timestamp_lidar = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
@@ -467,7 +467,7 @@ void imu_cbk(const ImuMsgConstPtr &msg_in)
         #ifdef USE_ROS1
             ROS_WARN("imu loop back, clear buffer");
         #elif defined(USE_ROS2)
-            RCLCPP_WARN(rclcpp::get_logger("fast_lio_sam"), "imu loop back, clear buffer");
+            RCLCPP_WARN(rclcpp::get_logger("li_pipline"), "imu loop back, clear buffer");
         #endif
         imu_buffer.clear();
     }
@@ -504,7 +504,7 @@ void reloc_cbk(const PoseStampedMsgConstPtr &msg_in)
         ROS_INFO("Reloc received: (%.3f, %.3f, %.3f), quat=(%.3f, %.3f, %.3f, %.3f)",
             x, y, z, qx, qy, qz, qw);
     #elif defined(USE_ROS2)
-        RCLCPP_INFO(rclcpp::get_logger("fast_lio_sam"), "Reloc received: (%.3f, %.3f, %.3f), quat=(%.3f, %.3f, %.3f, %.3f)",
+        RCLCPP_INFO(rclcpp::get_logger("li_pipline"), "Reloc received: (%.3f, %.3f, %.3f), quat=(%.3f, %.3f, %.3f, %.3f)",
             x, y, z, qx, qy, qz, qw);
     #endif
 }
@@ -530,7 +530,7 @@ bool sync_packages(MeasureGroup &meas)
             #ifdef USE_ROS1
                 ROS_WARN("Too few input point cloud!\n");
             #elif defined(USE_ROS2)
-                RCLCPP_WARN(rclcpp::get_logger("fast_lio_sam"), "Too few input point cloud!\n");
+                RCLCPP_WARN(rclcpp::get_logger("li_pipline"), "Too few input point cloud!\n");
             #endif
         }
         else if (meas.lidar->points.back().curvature / double(1000) < 0.5 * lidar_mean_scantime)
@@ -1072,7 +1072,7 @@ void h_share_model(state_ikfom &s, esekfom::dyn_share_datastruct<double> &ekfom_
         #ifdef USE_ROS1
             ROS_WARN("No Effective Points! \n");
         #elif defined(USE_ROS2)
-            RCLCPP_WARN(rclcpp::get_logger("fast_lio_sam"), "No Effective Points! \n");
+            RCLCPP_WARN(rclcpp::get_logger("li_pipline"), "No Effective Points! \n");
         #endif
         return;
     }
@@ -1317,7 +1317,7 @@ int main(int argc, char** argv)
         #ifdef USE_ROS1
             ROS_INFO("...... LIO-SAM Backend Start......");
         #elif defined(USE_ROS2)
-            RCLCPP_INFO(rclcpp::get_logger("fast_lio_sam"), "...... LIO-SAM Backend Start......");
+            RCLCPP_INFO(rclcpp::get_logger("li_pipline"), "...... LIO-SAM Backend Start......");
         #endif
     }
 
@@ -1358,7 +1358,7 @@ int main(int argc, char** argv)
                 #ifdef USE_ROS1
                     ROS_WARN("Relocalization Triggered!");
                 #elif defined(USE_ROS2)
-                    RCLCPP_WARN(rclcpp::get_logger("fast_lio_sam"), "Relocalization Triggered!");
+                    RCLCPP_WARN(rclcpp::get_logger("li_pipline"), "Relocalization Triggered!");
                 #endif
 
                 feats_down_world->clear();
@@ -1369,7 +1369,7 @@ int main(int argc, char** argv)
                     #ifdef USE_ROS1
                         ROS_INFO("...... Start Relocalization ......");
                     #elif defined(USE_ROS2)
-                        RCLCPP_INFO(rclcpp::get_logger("fast_lio_sam"), "...... Start Relocalization ......");
+                        RCLCPP_INFO(rclcpp::get_logger("li_pipline"), "...... Start Relocalization ......");
                     #endif
                     state_point_reloc.pos = Eigen::Vector3d(reloc_state.x_, reloc_state.y_, reloc_state.z_);
                     state_point_reloc.rot = Eigen::Quaterniond(reloc_state.qw_, reloc_state.qx_,
@@ -1384,7 +1384,7 @@ int main(int argc, char** argv)
                     state_point_reloc.pos.x(), state_point_reloc.pos.y(), state_point_reloc.pos.z(),
                     state_point_reloc.rot.x(), state_point_reloc.rot.y(), state_point_reloc.rot.z(), state_point_reloc.rot.w());
                 #elif defined(USE_ROS2)
-                    RCLCPP_INFO(rclcpp::get_logger("fast_lio_sam"), "Reloc: pos=(%.2f %.2f %.2f), quat=(%.2f %.2f %.2f %.2f)",
+                    RCLCPP_INFO(rclcpp::get_logger("li_pipline"), "Reloc: pos=(%.2f %.2f %.2f), quat=(%.2f %.2f %.2f %.2f)",
                     state_point_reloc.pos.x(), state_point_reloc.pos.y(), state_point_reloc.pos.z(),
                     state_point_reloc.rot.x(), state_point_reloc.rot.y(), state_point_reloc.rot.z(), state_point_reloc.rot.w());
                 #endif
@@ -1393,7 +1393,7 @@ int main(int argc, char** argv)
                 #ifdef USE_ROS1
                     ROS_INFO("...... Relocalization Complete ......");
                 #elif defined(USE_ROS2)
-                    RCLCPP_INFO(rclcpp::get_logger("fast_lio_sam"), "...... Relocalization Complete ......");
+                    RCLCPP_INFO(rclcpp::get_logger("li_pipline"), "...... Relocalization Complete ......");
                 #endif
                 continue;
             }
@@ -1427,7 +1427,7 @@ int main(int argc, char** argv)
                 #ifdef USE_ROS1
                     ROS_WARN("No point, skip this scan!\n");
                 #elif defined(USE_ROS2)
-                    RCLCPP_WARN(rclcpp::get_logger("fast_lio_sam"), "No point, skip this scan!");
+                    RCLCPP_WARN(rclcpp::get_logger("li_pipline"), "No point, skip this scan!");
                 #endif
                 continue;
             }
@@ -1467,7 +1467,7 @@ int main(int argc, char** argv)
                 #ifdef USE_ROS1
                     ROS_WARN("No point, skip this scan!\n");
                 #elif defined(USE_ROS2)
-                    RCLCPP_WARN(rclcpp::get_logger("fast_lio_sam"), "No point, skip this scan!");
+                    RCLCPP_WARN(rclcpp::get_logger("li_pipline"), "No point, skip this scan!");
                 #endif
                 continue;
             }

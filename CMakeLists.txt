@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(fast_lio_sam)
+project(li_pipline)
 
 SET(CMAKE_BUILD_TYPE "Debug")
 
@@ -104,13 +104,13 @@ if(USE_ROS1)
     INCLUDE_DIRS
   )
 
-  add_executable(fastlio_mapping src/laserMapping.cpp 
+  add_executable(li_pipline src/laserMapping.cpp 
     include/map/ikd-Tree/ikd_Tree.cpp 
     include/map/octvox/octvox.cpp
     src/preprocess.cpp src/utility.cpp 
     src/mapOptimization.cpp)
-  target_link_libraries(fastlio_mapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES} gtsam)
-  target_include_directories(fastlio_mapping PRIVATE ${PYTHON_INCLUDE_DIRS})
+  target_link_libraries(li_pipline ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES} gtsam)
+  target_include_directories(li_pipline PRIVATE ${PYTHON_INCLUDE_DIRS})
 endif()
 
 if(USE_ROS2)
@@ -126,8 +126,8 @@ if(USE_ROS2)
   find_package(livox_ros_driver2)
   find_package(visualization_msgs REQUIRED)
   
-  add_executable(fastlio_mapping src/laserMapping.cpp include/ikd-Tree/ikd_Tree.cpp src/preprocess.cpp)
-  ament_target_dependencies(fastlio_mapping
+  add_executable(li_pipline src/laserMapping.cpp include/ikd-Tree/ikd_Tree.cpp src/preprocess.cpp)
+  ament_target_dependencies(li_pipline
     rclcpp
     sensor_msgs
     geometry_msgs
@@ -140,8 +140,8 @@ if(USE_ROS2)
     livox_ros_driver2
     visualization_msgs
   )
-  target_link_libraries(fastlio_mapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES})
-  target_include_directories(fastlio_mapping PRIVATE ${PYTHON_INCLUDE_DIRS})
+  target_link_libraries(li_pipline ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES})
+  target_include_directories(li_pipline PRIVATE ${PYTHON_INCLUDE_DIRS})
   install(
   DIRECTORY
     launch_ROS2
@@ -153,7 +153,7 @@ if(USE_ROS2)
     rviz_cfg/loam_livox_ros2.rviz
     DESTINATION share/${PROJECT_NAME}/rviz_cfg
   )
-  install(TARGETS fastlio_mapping
+  install(TARGETS li_pipline
     DESTINATION lib/${PROJECT_NAME})
   install(DIRECTORY include/ DESTINATION include)
 
